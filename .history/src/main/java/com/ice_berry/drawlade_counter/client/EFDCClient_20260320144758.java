@@ -2,7 +2,6 @@ package com.ice_berry.drawlade_counter.client;
 
 import com.ice_berry.drawlade_counter.EFDCMod;
 import com.ice_berry.drawlade_counter.client.input.EFDCKeyBindings;
-import com.ice_berry.drawlade_counter.client.input.WeaponFlowInputHandler;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
@@ -13,7 +12,6 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.common.NeoForge;
 
 @Mod(value = EFDCMod.MODID, dist = Dist.CLIENT)
 public class EFDCClient {
@@ -22,9 +20,6 @@ public class EFDCClient {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         modEventBus.addListener(EFDCClient::onClientSetup);
         modEventBus.addListener(EFDCClient::registerKeyMappings);
-
-        // 注册客户端游戏事件处理器
-        NeoForge.EVENT_BUS.addListener(WeaponFlowInputHandler::onClientTick);
     }
 
     static void onClientSetup(FMLClientSetupEvent event) {

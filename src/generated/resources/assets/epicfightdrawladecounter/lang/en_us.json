@@ -1,0 +1,15 @@
+{
+  "block.epicfightdrawladecounter.example_block": "Example Block",
+  "epicfightdrawladecounter.configuration.items": "Item List",
+  "epicfightdrawladecounter.configuration.logDirtBlock": "Log Dirt Block",
+  "epicfightdrawladecounter.configuration.magicNumber": "Magic Number",
+  "epicfightdrawladecounter.configuration.magicNumberIntroduction": "Magic Number Text",
+  "epicfightdrawladecounter.configuration.section.epicfightdrawladecounter.common.toml": "EpicFight - Drawlade_Counter Configs",
+  "epicfightdrawladecounter.configuration.section.epicfightdrawladecounter.common.toml.title": "EpicFight - Drawlade_Counter Configs",
+  "epicfightdrawladecounter.configuration.title": "EpicFight - Drawlade_Counter Configs",
+  "item.epicfightdrawladecounter.example_item": "Example Item",
+  "itemGroup.epicfightdrawladecounter": "EpicFight Drawlade Counter",
+  "key.categories.epicfightdrawladecounter": "EpicFight Drawlade Counter",
+  "key.epicfightdrawladecounter.next_weapon": "Next Weapon",
+  "key.epicfightdrawladecounter.previous_weapon": "Previous Weapon"
+}

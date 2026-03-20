@@ -2,15 +2,12 @@ package com.ice_berry.drawlade_counter;
 
 import org.slf4j.Logger;
 
-import com.ice_berry.drawlade_counter.capability.WeaponFlowProvider;
 import com.ice_berry.drawlade_counter.config.Config;
-import com.ice_berry.drawlade_counter.datagen.EFDCDatagen;
 import com.mojang.logging.LogUtils;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -20,16 +17,15 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -60,7 +56,7 @@ public class EFDCMod {
             .alwaysEdible().nutrition(1).saturationModifier(2f).build()));
 
     // Creates a creative tab with the id "epicfightdrawladecounter:example_tab" for the example item, that is placed after the combat tab
-    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("epicfight_drawlade_counter", () -> CreativeModeTab.builder()
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("EpicFight-DrawladeCounter", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.epicfightdrawladecounter")) //The language key for the title of your CreativeModeTab
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
@@ -88,17 +84,6 @@ public class EFDCMod {
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
-
-        // Register weapon flow capability (MOD bus event)
-        modEventBus.addListener(EFDCMod::onRegisterCapabilities);
-
-        // Register datagen providers (only fires during data generation)
-        modEventBus.addListener(EFDCDatagen::gatherData);
-
-        // Register player event handlers (GAME bus)
-        NeoForge.EVENT_BUS.addListener(EFDCMod::onPlayerClone);
-        NeoForge.EVENT_BUS.addListener(EFDCMod::onPlayerSave);
-        NeoForge.EVENT_BUS.addListener(EFDCMod::onPlayerLoggedOut);
 
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -129,41 +114,5 @@ public class EFDCMod {
     public void onServerStarting(ServerStartingEvent event) {
         // Do something when the server starts
         LOGGER.info("HELLO from server starting");
-    }
-
-    // ==================== Weapon Flow Capability 事件处理 ====================
-
-    /**
-     * 注册武器流转 EntityCapability（MOD 总线事件）
-     */
-    private static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
-        event.registerEntity(
-                WeaponFlowProvider.WEAPON_FLOW_CAPABILITY,
-                EntityType.PLAYER,
-                new WeaponFlowProvider()
-        );
-        LOGGER.info("EFDC WeaponFlow Capability registered");
-    }
-
-    /**
-     * 玩家死亡/维度切换时复制武器流转数据
-     */
-    private static void onPlayerClone(PlayerEvent.Clone event) {
-        WeaponFlowProvider.copyCapability(event.getOriginal(), event.getEntity());
-    }
-
-    /**
-     * 玩家数据保存时同步武器流转数据到 persistentData
-     */
-    private static void onPlayerSave(PlayerEvent.SaveToFile event) {
-        WeaponFlowProvider.saveCapability(event.getEntity());
-    }
-
-    /**
-     * 玩家登出时保存并清除内存缓存
-     */
-    private static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        WeaponFlowProvider.saveCapability(event.getEntity());
-        WeaponFlowProvider.removeCapability(event.getEntity().getUUID());
     }
 }
