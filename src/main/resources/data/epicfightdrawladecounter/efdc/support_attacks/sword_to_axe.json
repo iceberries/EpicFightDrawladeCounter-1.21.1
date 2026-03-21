@@ -1,0 +1,12 @@
+{
+  "from_weapon": "minecraft:iron_sword",
+  "to_weapon": "minecraft:iron_axe",
+  "damage_multiplier": 1.5,
+  "cooldown_ticks": 40,
+  "knockback": 0.8,
+  "range": 4.0,
+  "sound": "minecraft:entity.player.attack.sweep",
+  "particle": "sweep",
+  "ef_animation": "epicfight:biped/combat/axe_auto1",
+  "ef_animation_priority": 10
+}

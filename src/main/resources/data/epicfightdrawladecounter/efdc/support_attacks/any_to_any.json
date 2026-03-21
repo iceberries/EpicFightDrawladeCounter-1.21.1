@@ -1,0 +1,10 @@
+{
+  "from_weapon": null,
+  "to_weapon": null,
+  "damage_multiplier": 1.0,
+  "cooldown_ticks": 30,
+  "knockback": 0.3,
+  "range": 3.0,
+  "sound": "minecraft:entity.player.attack.sweep",
+  "particle": "crit"
+}

@@ -1,13 +1,14 @@
 package com.ice_berry.drawlade_counter;
 
-import org.slf4j.Logger;
-
 import com.ice_berry.drawlade_counter.capability.WeaponFlowProvider;
+import com.ice_berry.drawlade_counter.combat.SupportAttackHandler;
 import com.ice_berry.drawlade_counter.config.Config;
+import com.ice_berry.drawlade_counter.config.DataDrivenLoader;
 import com.ice_berry.drawlade_counter.datagen.EFDCDatagen;
+import com.ice_berry.drawlade_counter.network.NetworkHandler;
+import com.ice_berry.drawlade_counter.until.epicfight.EFEventsHandler;
 import com.mojang.logging.LogUtils;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -17,7 +18,6 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
@@ -28,114 +28,85 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import org.slf4j.Logger;
 
-// The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(EFDCMod.MODID)
 public class EFDCMod {
-    // Define mod id in a common place for everything to reference
     public static final String MODID = "epicfightdrawladecounter";
-    // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
-    // Create a Deferred Register to hold Blocks which will all be registered under the "epicfightdrawladecounter" namespace
+
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
-    // Create a Deferred Register to hold Items which will all be registered under the "epicfightdrawladecounter" namespace
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
-    // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "epicfightdrawladecounter" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    // Creates a new Block with the id "epicfightdrawladecounter:example_block", combining the namespace and path
     public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
-    // Creates a new BlockItem with the id "epicfightdrawladecounter:example_block", combining the namespace and path
     public static final DeferredItem<BlockItem> EXAMPLE_BLOCK_ITEM = ITEMS.registerSimpleBlockItem("example_block", EXAMPLE_BLOCK);
 
-    // Creates a new food item with the id "epicfightdrawladecounter:example_id", nutrition 1 and saturation 2
     public static final DeferredItem<Item> EXAMPLE_ITEM = ITEMS.registerSimpleItem("example_item", new Item.Properties().food(new FoodProperties.Builder()
             .alwaysEdible().nutrition(1).saturationModifier(2f).build()));
 
-    // Creates a creative tab with the id "epicfightdrawladecounter:example_tab" for the example item, that is placed after the combat tab
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("epicfight_drawlade_counter", () -> CreativeModeTab.builder()
-            .title(Component.translatable("itemGroup.epicfightdrawladecounter")) //The language key for the title of your CreativeModeTab
+            .title(Component.translatable("itemGroup.epicfightdrawladecounter"))
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
-                output.accept(EXAMPLE_ITEM.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
+                output.accept(EXAMPLE_ITEM.get());
             }).build());
 
-    // The constructor for the mod class is the first code that is run when your mod is loaded.
-    // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.
     public EFDCMod(IEventBus modEventBus, ModContainer modContainer) {
-        // Register the commonSetup method for modloading
-        modEventBus.addListener(this::commonSetup);
-
-        // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so items get registered
         ITEMS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
 
-        // Register ourselves for server and other game events we are interested in.
-        // Note that this is necessary if and only if we want *this* class (EpicFightDrawladeCounter) to respond directly to events.
-        // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
 
-        // Register the item to a creative tab
+        // MOD 总线
+        modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
-
-        // Register weapon flow capability (MOD bus event)
         modEventBus.addListener(EFDCMod::onRegisterCapabilities);
-
-        // Register datagen providers (only fires during data generation)
+        modEventBus.addListener(this::onRegisterPayloads);
         modEventBus.addListener(EFDCDatagen::gatherData);
 
-        // Register player event handlers (GAME bus)
+        // GAME 总线
         NeoForge.EVENT_BUS.addListener(EFDCMod::onPlayerClone);
-        NeoForge.EVENT_BUS.addListener(EFDCMod::onPlayerSave);
         NeoForge.EVENT_BUS.addListener(EFDCMod::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(EFDCMod::onServerTick);
 
-        // Register our mod's ModConfigSpec so that FML can create and load the config file for us
+        // 配置
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+
+        // 初始化（检测 Epic Fight）
+        SupportAttackHandler.init();
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        // Some common setup code
-        LOGGER.info("HELLO FROM COMMON SETUP");
-
-        if (Config.LOG_DIRT_BLOCK.getAsBoolean()) {
-            LOGGER.info("DIRT BLOCK >> {}", BuiltInRegistries.BLOCK.getKey(Blocks.DIRT));
-        }
-
-        LOGGER.info("{}{}", Config.MAGIC_NUMBER_INTRODUCTION.get(), Config.MAGIC_NUMBER.getAsInt());
-
-        Config.ITEM_STRINGS.get().forEach((item) -> LOGGER.info("ITEM >> {}", item));
+        LOGGER.info("EFDC Common Setup");
+        event.enqueueWork(EFEventsHandler::register);
     }
 
-    // Add the example block item to the building blocks tab
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(EXAMPLE_BLOCK_ITEM);
         }
     }
 
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        // Do something when the server starts
-        LOGGER.info("HELLO from server starting");
+    private void onAddReloadListeners(AddReloadListenerEvent event) {
+        event.addListener(new DataDrivenLoader());
     }
 
-    // ==================== Weapon Flow Capability 事件处理 ====================
+    // ==================== Capability 注册 ====================
 
-    /**
-     * 注册武器流转 EntityCapability（MOD 总线事件）
-     */
     private static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
         event.registerEntity(
                 WeaponFlowProvider.WEAPON_FLOW_CAPABILITY,
@@ -145,25 +116,34 @@ public class EFDCMod {
         LOGGER.info("EFDC WeaponFlow Capability registered");
     }
 
-    /**
-     * 玩家死亡/维度切换时复制武器流转数据
-     */
+    // ==================== 网络包注册 ====================
+
+    private void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        NetworkHandler.register(event);
+    }
+
+    // ==================== 玩家事件 ====================
+
     private static void onPlayerClone(PlayerEvent.Clone event) {
         WeaponFlowProvider.copyCapability(event.getOriginal(), event.getEntity());
     }
 
-    /**
-     * 玩家数据保存时同步武器流转数据到 persistentData
-     */
-    private static void onPlayerSave(PlayerEvent.SaveToFile event) {
-        WeaponFlowProvider.saveCapability(event.getEntity());
-    }
-
-    /**
-     * 玩家登出时保存并清除内存缓存
-     */
     private static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         WeaponFlowProvider.saveCapability(event.getEntity());
         WeaponFlowProvider.removeCapability(event.getEntity().getUUID());
+    }
+
+    // ==================== 服务端 Tick ====================
+
+    private static void onServerTick(ServerTickEvent.Post event) {
+        var server = event.getServer();
+        if (server == null) return;
+
+        for (var player : server.getPlayerList().getPlayers()) {
+            var cap = WeaponFlowProvider.getCapability(player);
+            if (cap != null) {
+                cap.tick();
+            }
+        }
     }
 }
