@@ -2,55 +2,56 @@ package com.ice_berry.drawlade_counter.until.epicfight;
 
 import com.ice_berry.drawlade_counter.EFDCMod;
 import net.neoforged.fml.ModList;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Epic Fight 技能系统集成
  * 提供与 EF 技能系统对接的工具方法。
- *
- * <p>阶段二功能：</p>
- * <ul>
- *   <li>查询玩家是否处于 EF 战斗动画中（用于判断是否允许切换武器）</li>
- *   <li>获取 EF 武器属性（用于伤害计算）</li>
- * </ul>
- *
- * <p>所有方法通过反射安全调用，EF 未加载时返回安全的默认值。</p>
  */
 public final class EFSkillIntegration {
 
     private EFSkillIntegration() {}
 
     /**
-     * 检查玩家当前是否正在执行 Epic Fight 的攻击动画
-     * 如果玩家正在攻击动画中，可能需要延迟武器切换。
+     * 检查玩家当前是否被 Epic Fight 动画锁定（不允许切换物品）
+     * 通过 LivingEntityPatch.getEntityState().canSwitchHoldingItem() 判断，
+     * 攻击动画、眩晕、击倒等状态下返回 false。
      *
      * @param player 要检查的玩家
-     * @return true 表示正在攻击动画中；EF 未加载时返回 false
+     * @return true 表示被锁定，不允许切换武器；EF 未加载时返回 false
      */
     public static boolean isPlayerInAttackAnimation(Object player) {
         if (!ModList.get().isLoaded("epicfight")) return false;
 
         try {
             Class<?> capsClass = Class.forName("yesman.epicfight.world.capabilities.EpicFightCapabilities");
-            Class<?> patchClass = Class.forName("yesman.epicfight.world.entity.LivingEntityPatch");
+            Class<?> patchClass = Class.forName("yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch");
 
+            // EF 21.12.5: getEntityPatch(Entity, Class) — 参数是 Entity 不是 LivingEntity
             var getPatch = capsClass.getMethod("getEntityPatch",
-                    net.minecraft.world.entity.LivingEntity.class, Class.class);
+                    net.minecraft.world.entity.Entity.class, Class.class);
             Object patch = getPatch.invoke(null, player, patchClass);
 
             if (patch == null) return false;
 
-            // 检查 entityPatch.getAnimator().isPlaying()
-            Class<?> animatorClass = Class.forName("yesman.epicfight.api.animation.Animator");
-            var getAnimator = patchClass.getMethod("getAnimator");
-            Object animator = getAnimator.invoke(patch);
+            // 调用 LivingEntityPatch.getEntityState().canSwitchHoldingItem()
+            var getEntityState = patchClass.getMethod("getEntityState");
+            Object entityState = getEntityState.invoke(patch);
 
-            var isPlaying = animatorClass.getMethod("isPlaying");
-            return (boolean) isPlaying.invoke(animator);
+            var canSwitch = entityState.getClass().getMethod("canSwitchHoldingItem");
+            boolean result = (boolean) canSwitch.invoke(entityState);
+
+            // canSwitchHoldingItem() 返回 false 表示被动画锁定
+            return !result;
 
         } catch (ClassNotFoundException e) {
+            EFDCMod.LOGGER.warn("Epic Fight classes not found, animation lock check disabled");
+            return false;
+        } catch (NoSuchMethodException e) {
+            EFDCMod.LOGGER.warn("Epic Fight API method signature mismatch: {}", e.getMessage());
             return false;
         } catch (Exception e) {
-            EFDCMod.LOGGER.debug("Failed to check EF animation state", e);
+            EFDCMod.LOGGER.warn("Failed to check EF animation state", e);
             return false;
         }
     }
@@ -66,21 +67,9 @@ public final class EFSkillIntegration {
         if (!ModList.get().isLoaded("epicfight")) return 0F;
 
         try {
-            Class<?> itemCapClass = Class.forName("yesman.epicfight.gameasset.Weapons");
-            Class<?> capabilityClass = Class.forName("yesman.epicfight.api.data.rewriter.ItemCapability");
-
-            var getWeaponCap = itemCapClass.getMethod("getCapability", net.minecraft.world.item.ItemStack.class);
-            Object cap = getWeaponCap.invoke(null, weaponStack);
-
-            if (cap == null) return 0F;
-
-            var getDamage = capabilityClass.getMethod("getDamageValue", net.minecraft.world.item.ItemStack.class);
-            return (float) getDamage.invoke(cap, weaponStack);
-
-        } catch (ClassNotFoundException e) {
+            EFDCMod.LOGGER.debug("getEFWeaponDamage: EF 21.12.5 does not expose direct damage method, returning 0");
             return 0F;
         } catch (Exception e) {
-            EFDCMod.LOGGER.debug("Failed to get EF weapon damage", e);
             return 0F;
         }
     }

@@ -91,12 +91,20 @@ public class DataDrivenLoader implements PreparableReloadListener {
 
     @Nullable
     public static SupportAttackData findSupportAttack(@Nullable Item fromItem, @Nullable Item toItem) {
+        SupportAttackData fallback = null;
         for (SupportAttackData data : SUPPORT_ATTACKS.values()) {
             if (data.matches(fromItem, toItem)) {
-                return data;
+                // 精确匹配（双方都指定了武器）优先返回
+                if (data.getFromWeapon() != null && data.getToWeapon() != null) {
+                    return data;
+                }
+                // 记录第一个通配匹配作为兜底
+                if (fallback == null) {
+                    fallback = data;
+                }
             }
         }
-        return null;
+        return fallback;
     }
 
     @Nullable

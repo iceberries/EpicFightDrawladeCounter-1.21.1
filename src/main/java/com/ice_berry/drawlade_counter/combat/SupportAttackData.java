@@ -87,6 +87,9 @@ public class SupportAttackData {
     public String getSound() { return sound; }
     public String getParticle() { return particle; }
 
+    /** ef_animation 的 "auto" 特殊值常量 — 表示自动使用 toWeapon 的 EF 武器攻击动画 */
+    public static final String EF_ANIMATION_AUTO = "auto";
+
     /** Epic Fight 攻击动画 ResourceLocation，null 表示使用原版攻击逻辑 */
     @Nullable
     public ResourceLocation getEfAnimation() { return efAnimation; }
@@ -94,8 +97,11 @@ public class SupportAttackData {
     /** Epic Fight 动画优先级 */
     public int getEfAnimationPriority() { return efAnimationPriority; }
 
-    /** 是否配置了 Epic Fight 动画 */
+    /** 是否配置了 Epic Fight 动画（包括 auto 模式） */
     public boolean hasEfAnimation() { return efAnimation != null; }
+
+    /** 是否为 auto 模式（从 toWeapon 的 EF 武器能力自动获取攻击动画） */
+    public boolean isAutoAnimation() { return efAnimation != null && EF_ANIMATION_AUTO.equals(efAnimation.getPath()); }
 
     // ==================== 匹配逻辑 ====================
 

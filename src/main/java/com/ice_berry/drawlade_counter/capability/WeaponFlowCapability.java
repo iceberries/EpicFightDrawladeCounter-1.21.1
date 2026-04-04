@@ -17,10 +17,14 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
     /** 各流转槽位的剩余冷却时间（tick） */
     private final int[] slotCooldowns;
 
+    /** 各流转槽位的最大冷却时间（tick），用于 HUD 进度显示 */
+    private final int[] maxCooldowns;
+
     public WeaponFlowCapability() {
         this.currentActiveSlot = 0;
         this.weaponSlotIndices = DEFAULT_WEAPON_SLOT_INDICES.clone();
         this.slotCooldowns = new int[WEAPON_SLOT_COUNT];
+        this.maxCooldowns = new int[WEAPON_SLOT_COUNT];
     }
 
     // ==================== 槽位索引管理 ====================
@@ -79,12 +83,24 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
     }
 
     @Override
+    public int getSlotMaxCooldown(int flowSlot) {
+        if (flowSlot < 0 || flowSlot >= WEAPON_SLOT_COUNT) {
+            throw new IndexOutOfBoundsException(
+                    "Flow slot index out of range: " + flowSlot + ", size: " + WEAPON_SLOT_COUNT);
+        }
+        return maxCooldowns[flowSlot];
+    }
+
+    @Override
     public void setSlotCooldown(int flowSlot, int ticks) {
         if (flowSlot < 0 || flowSlot >= WEAPON_SLOT_COUNT) {
             throw new IndexOutOfBoundsException(
                     "Flow slot index out of range: " + flowSlot + ", size: " + WEAPON_SLOT_COUNT);
         }
         this.slotCooldowns[flowSlot] = Math.max(0, ticks);
+        if (ticks > this.maxCooldowns[flowSlot]) {
+            this.maxCooldowns[flowSlot] = ticks;
+        }
     }
 
     @Override
@@ -94,12 +110,14 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
                     "Flow slot index out of range: " + flowSlot + ", size: " + WEAPON_SLOT_COUNT);
         }
         this.slotCooldowns[flowSlot] = 0;
+        this.maxCooldowns[flowSlot] = 0;
     }
 
     @Override
     public void clearAllCooldowns() {
         for (int i = 0; i < WEAPON_SLOT_COUNT; i++) {
             slotCooldowns[i] = 0;
+            maxCooldowns[i] = 0;
         }
     }
 
@@ -122,6 +140,9 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
         for (int i = 0; i < WEAPON_SLOT_COUNT; i++) {
             if (slotCooldowns[i] > 0) {
                 slotCooldowns[i]--;
+                if (slotCooldowns[i] == 0) {
+                    maxCooldowns[i] = 0;
+                }
             }
         }
     }
@@ -131,12 +152,14 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
     private static final String TAG_ACTIVE_SLOT = "ActiveSlot";
     private static final String TAG_SLOT_INDICES = "SlotIndices";
     private static final String TAG_SLOT_COOLDOWNS = "SlotCooldowns";
+    private static final String TAG_MAX_COOLDOWNS = "MaxCooldowns";
 
     @Override
     public void save(CompoundTag tag) {
         tag.putInt(TAG_ACTIVE_SLOT, currentActiveSlot);
         tag.putIntArray(TAG_SLOT_INDICES, weaponSlotIndices);
         tag.putIntArray(TAG_SLOT_COOLDOWNS, slotCooldowns);
+        tag.putIntArray(TAG_MAX_COOLDOWNS, maxCooldowns);
     }
 
     @Override
@@ -154,6 +177,12 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
             int[] loaded = tag.getIntArray(TAG_SLOT_COOLDOWNS);
             if (loaded.length == WEAPON_SLOT_COUNT) {
                 System.arraycopy(loaded, 0, this.slotCooldowns, 0, WEAPON_SLOT_COUNT);
+            }
+        }
+        if (tag.contains(TAG_MAX_COOLDOWNS, CompoundTag.TAG_INT_ARRAY)) {
+            int[] loaded = tag.getIntArray(TAG_MAX_COOLDOWNS);
+            if (loaded.length == WEAPON_SLOT_COUNT) {
+                System.arraycopy(loaded, 0, this.maxCooldowns, 0, WEAPON_SLOT_COUNT);
             }
         }
     }

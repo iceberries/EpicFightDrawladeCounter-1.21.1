@@ -70,6 +70,14 @@ public interface IWeaponFlowCapability {
     int getSlotCooldown(int flowSlot);
 
     /**
+     * 获取指定流转槽位的最大冷却 tick（用于 HUD 进度计算）
+     *
+     * @param flowSlot 流转槽位索引
+     * @return 最大冷却 tick，无冷却记录时返回 0
+     */
+    int getSlotMaxCooldown(int flowSlot);
+
+    /**
      * 设置指定流转槽位的冷却时间
      *
      * @param flowSlot 流转槽位索引

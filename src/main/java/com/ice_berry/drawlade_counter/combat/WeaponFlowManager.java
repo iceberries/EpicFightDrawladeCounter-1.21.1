@@ -7,7 +7,6 @@ import com.ice_berry.drawlade_counter.capability.WeaponFlowProvider;
 import com.ice_berry.drawlade_counter.config.DataDrivenLoader;
 import com.ice_berry.drawlade_counter.network.NetworkHandler;
 import com.ice_berry.drawlade_counter.network.packets.CooldownUpdatePacket;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -16,17 +15,6 @@ import org.jetbrains.annotations.Nullable;
 /**
  * 武器流转管理器
  * 统一管理武器切换、支援攻击触发的完整流程。
- *
- * <h3>武器切换流程：</h3>
- * <ol>
- *   <li>客户端检测按键 → 发送 C2S 包</li>
- *   <li>服务端收到包 → 调用 {@link #switchWeapon}</li>
- *   <li>检查冷却和战斗状态</li>
- *   <li>投递 {@link WeaponSwitchEvent}</li>
- *   <li>更新 Capability 中的当前槽位</li>
- *   <li>查找匹配的支援攻击数据 → 若匹配则执行支援攻击</li>
- *   <li>同步冷却给客户端</li>
- * </ol>
  */
 public final class WeaponFlowManager {
 
@@ -36,19 +24,17 @@ public final class WeaponFlowManager {
      * 处理武器切换请求（服务端调用）
      *
      * @param player       发起切换的玩家
+     * @param oldSlot      客户端发送的切换前旧槽位索引
      * @param direction    切换方向：+1 下一武器，-1 上一武器
      */
-    public static void switchWeapon(Player player, int direction) {
+    public static void switchWeapon(Player player, int oldSlot, int direction) {
         IWeaponFlowCapability cap = WeaponFlowProvider.getCapability(player);
         if (cap == null) return;
 
-        int currentSlot = cap.getCurrentActiveSlot();
-        int oldSlot = currentSlot;
-
-        // 计算新槽位
-        int newSlot = direction > 0
-                ? (currentSlot + 1) % IWeaponFlowCapability.WEAPON_SLOT_COUNT
-                : (currentSlot - 1 + IWeaponFlowCapability.WEAPON_SLOT_COUNT) % IWeaponFlowCapability.WEAPON_SLOT_COUNT;
+        // 根据客户端提供的旧槽位 + 方向计算新槽位
+        // （不依赖 cap.getCurrentActiveSlot()，因为在集成服务器下该值可能已被客户端修改）
+        int newSlot = (oldSlot + direction + IWeaponFlowCapability.WEAPON_SLOT_COUNT)
+                % IWeaponFlowCapability.WEAPON_SLOT_COUNT;
 
         // 冷却检查 —— 切换本身不受冷却限制（但支援攻击受限制）
         ItemStack fromWeapon = getWeaponInSlot(player, oldSlot);

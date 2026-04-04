@@ -7,16 +7,6 @@ import net.neoforged.fml.ModList;
 /**
  * Epic Fight 事件监听器
  * 监听 EF 的事件总线，在关键时刻注入武器流转逻辑。
- *
- * <p>注意：Epic Fight 使用自己的事件系统。
- * 在 NeoForge 1.21.1 中，EF 事件位于 {@code yesman.epicfight.api.neoevent} 包下。
- * 由于 EF 是软依赖，本类通过反射安全地注册事件监听。</p>
- *
- * <p>阶段二主要监听：</p>
- * <ul>
- *   <li>EF 动画结束事件 —— 清除支援攻击中的战斗状态</li>
- *   <li>EF 伤害事件 —— 判断是否为支援攻击造成的伤害</li>
- * </ul>
  */
 public final class EFEventsHandler {
 

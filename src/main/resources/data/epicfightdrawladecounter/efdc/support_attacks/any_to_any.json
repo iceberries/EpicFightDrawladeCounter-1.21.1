@@ -6,5 +6,7 @@
   "knockback": 0.3,
   "range": 3.0,
   "sound": "minecraft:entity.player.attack.sweep",
-  "particle": "crit"
+  "particle": "crit",
+  "ef_animation": "efdc:auto",
+  "ef_animation_priority": 0
 }

@@ -10,22 +10,21 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 武器切换数据包 (C2S)
  * 客户端按键后发送到服务端，请求切换武器。
- *
- * <p>协议：{@code [byte direction]}</p>
- * <ul>
- *   <li>{@code direction = 1} → 下一武器</li>
- *   <li>{@code direction = -1} → 上一武器</li>
- * </ul>
+ * 携带切换前的旧槽位索引，确保服务端在集成服务器（客户端和服务端共享 Capability 实例）下
+ * 也能正确计算新旧槽位，避免冷却设置到错误的槽位。
  */
-public record WeaponSwitchPacket(int direction) implements CustomPacketPayload {
+public record WeaponSwitchPacket(int oldSlot, int direction) implements CustomPacketPayload {
 
     public static final Type<WeaponSwitchPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("epicfightdrawladecounter", "weapon_switch"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, WeaponSwitchPacket> STREAM_CODEC =
             StreamCodec.of(
-                    (buf, packet) -> buf.writeByte(packet.direction),
-                    buf -> new WeaponSwitchPacket(buf.readByte())
+                    (buf, packet) -> {
+                        buf.writeByte(packet.oldSlot);
+                        buf.writeByte(packet.direction);
+                    },
+                    buf -> new WeaponSwitchPacket(buf.readByte(), buf.readByte())
             );
 
     @Override
@@ -39,7 +38,7 @@ public record WeaponSwitchPacket(int direction) implements CustomPacketPayload {
     public static void handle(WeaponSwitchPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                WeaponFlowManager.switchWeapon(serverPlayer, packet.direction);
+                WeaponFlowManager.switchWeapon(serverPlayer, packet.oldSlot, packet.direction);
             }
         });
     }

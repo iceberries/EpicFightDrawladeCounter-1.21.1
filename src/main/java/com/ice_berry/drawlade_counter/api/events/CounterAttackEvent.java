@@ -6,7 +6,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 /**
  * 反击事件基类（闪避反击 / 格挡反击 的父类）
- * 阶段三实现，阶段二仅定义结构。
  */
 public abstract class CounterAttackEvent extends PlayerEvent {
 

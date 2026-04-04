@@ -4,6 +4,7 @@ import com.ice_berry.drawlade_counter.EFDCMod;
 import com.ice_berry.drawlade_counter.capability.IWeaponFlowCapability;
 import com.ice_berry.drawlade_counter.capability.WeaponFlowProvider;
 import com.ice_berry.drawlade_counter.network.packets.WeaponSwitchPacket;
+import com.ice_berry.drawlade_counter.until.epicfight.EFSkillIntegration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -44,6 +45,13 @@ public class WeaponSwitchHandler {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
+        // 动画播放中禁止使用流转键切换武器
+        if (EFSkillIntegration.isPlayerInAttackAnimation(mc.player)) {
+            EFDCKeyBindings.PREVIOUS_WEAPON.consumeClick();
+            EFDCKeyBindings.NEXT_WEAPON.consumeClick();
+            return;
+        }
+
         if (EFDCKeyBindings.PREVIOUS_WEAPON.consumeClick()) {
             switchWeapon(mc.player, false);
         }
@@ -56,6 +64,7 @@ public class WeaponSwitchHandler {
 
     /**
      * 客户端 tick 事件处理
+     * - EF 动画播放中强制恢复快捷栏选中位，禁止切换武器
      * - 检测玩家手动切换快捷栏时同步流转激活槽位
      * - 检测武器槽位物品变化
      */
@@ -65,6 +74,17 @@ public class WeaponSwitchHandler {
         if (player == null || mc.screen != null) return;
 
         IWeaponFlowCapability cap = WeaponFlowProvider.getCapability(player);
+
+        // 动画播放中强制恢复快捷栏选中位，禁止任何形式的武器切换
+        if (EFSkillIntegration.isPlayerInAttackAnimation(player) && cap != null) {
+            int expectedHotbar = cap.getWeaponSlotIndex(cap.getCurrentActiveSlot());
+            if (player.getInventory().selected != expectedHotbar) {
+                player.getInventory().selected = expectedHotbar;
+                EFDCMod.LOGGER.debug("Animation playing, forced hotbar back to slot {}", expectedHotbar);
+            }
+            return;
+        }
+
         if (cap == null) return;
 
         // 1) 检测玩家手动切换快捷栏（通过数字键/滚轮等）
@@ -106,6 +126,10 @@ public class WeaponSwitchHandler {
         IWeaponFlowCapability cap = WeaponFlowProvider.getCapability(player);
         if (cap == null) return;
 
+        // 在切换前记录旧槽位，确保服务端能正确计算新旧槽位
+        int oldSlot = cap.getCurrentActiveSlot();
+        int direction = next ? 1 : -1;
+
         if (next) {
             cap.switchToNextWeapon();
         } else {
@@ -118,11 +142,11 @@ public class WeaponSwitchHandler {
         // 更新物品快照
         updateStackSnapshot(player, cap);
 
-        // 通知服务端
-        PacketDistributor.sendToServer(new WeaponSwitchPacket(next ? 1 : -1));
+        // 通知服务端（携带旧槽位，避免集成服务器下 capability 共享导致错位）
+        PacketDistributor.sendToServer(new WeaponSwitchPacket(oldSlot, direction));
 
-        EFDCMod.LOGGER.debug("Switched to flow slot {} (hotbar {})",
-                cap.getCurrentActiveSlot(), hotbarSlot);
+        EFDCMod.LOGGER.debug("Switched to flow slot {} (hotbar {}), oldSlot={}",
+                cap.getCurrentActiveSlot(), hotbarSlot, oldSlot);
     }
 
     /**

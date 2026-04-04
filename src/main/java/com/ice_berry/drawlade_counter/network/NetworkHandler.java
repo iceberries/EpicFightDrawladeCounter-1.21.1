@@ -1,6 +1,5 @@
 package com.ice_berry.drawlade_counter.network;
 
-import com.ice_berry.drawlade_counter.EFDCMod;
 import com.ice_berry.drawlade_counter.network.packets.CooldownUpdatePacket;
 import com.ice_berry.drawlade_counter.network.packets.TriggerEffectPacket;
 import com.ice_berry.drawlade_counter.network.packets.WeaponSwitchPacket;
@@ -47,15 +46,14 @@ public class NetworkHandler {
     // 客户端处理 TriggerEffectPacket
     private static void handleTriggerEffect(TriggerEffectPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
-            // 在这里执行客户端特效逻辑
-            // ClientEffectHandler.playParticle(...)
+            com.ice_berry.drawlade_counter.client.render.ParticleManager.spawnParticles(
+                    packet.x(), packet.y(), packet.z(),
+                    packet.particleType(), packet.dirX(), packet.dirY(), packet.dirZ());
         });
     }
     
     private static void handleCooldownUpdate(CooldownUpdatePacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            // 更新客户端冷却显示
-        });
+        CooldownUpdatePacket.handle(packet, context);
     }
     
     // 发送方法（静态工具方法）

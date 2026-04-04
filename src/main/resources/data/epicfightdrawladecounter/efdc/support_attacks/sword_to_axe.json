@@ -7,6 +7,6 @@
   "range": 4.0,
   "sound": "minecraft:entity.player.attack.sweep",
   "particle": "sweep",
-  "ef_animation": "epicfight:biped/combat/axe_auto1",
+  "ef_animation": "efdc:auto",
   "ef_animation_priority": 10
 }
