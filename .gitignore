@@ -3,6 +3,7 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/**/build/
+gradle/
 
 ### IntelliJ IDEA ###
 .idea/
@@ -30,6 +31,7 @@ bin/
 .vscode/
 .history/
 .codebuddy/
+.github/
 
 ### Mac OS ###
 .DS_Store
