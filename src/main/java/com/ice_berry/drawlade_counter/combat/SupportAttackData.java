@@ -13,38 +13,19 @@ import java.util.Optional;
 /**
  * 支援攻击数据定义
  * 对应 data/&lt;ns&gt;/efdc/support_attacks/&lt;name&gt;.json 中的每一条记录。
- *
- * <h3>JSON Schema:</h3>
- * <pre>{@code
- * {
- *   "from_weapon": "minecraft:iron_sword",   // 可选，null 表示匹配任意武器
- *   "to_weapon": "minecraft:iron_axe",       // 可选，null 表示匹配任意武器
- *   "damage_multiplier": 1.5,               // 伤害倍率
- *   "cooldown_ticks": 40,                   // 冷却 tick 数
- *   "knockback": 0.5,                       // 击退强度
- *   "range": 4.0,                           // 攻击范围
- *   "sound": "minecraft:entity.player.attack.sweep",  // 攻击音效
- *   "particle": "crit",                     // 粒子效果类型
- *   "ef_animation": "minecraft:biped/combat/onehand_auto1",  // Epic Fight 攻击动画 (可选)
- *   "ef_animation_priority": 0              // 动画优先级 (可选，默认0)
- * }
- * }</pre>
  */
 public class SupportAttackData {
 
     private final ResourceLocation id;
-    @Nullable
-    private final ResourceLocation fromWeapon;
-    @Nullable
-    private final ResourceLocation toWeapon;
+    @Nullable private final ResourceLocation fromWeapon;
+    @Nullable private final ResourceLocation toWeapon;
     private final float damageMultiplier;
     private final int cooldownTicks;
     private final float knockback;
     private final float range;
     private final String sound;
     private final String particle;
-    @Nullable
-    private final ResourceLocation efAnimation;
+    @Nullable private final ResourceLocation efAnimation;
     private final int efAnimationPriority;
 
     public SupportAttackData(ResourceLocation id,
@@ -68,7 +49,7 @@ public class SupportAttackData {
         this.efAnimationPriority = efAnimationPriority;
     }
 
-    // ==================== Getters ====================
+    // #region Getter 方法
 
     public ResourceLocation getId() { return id; }
 
@@ -87,23 +68,25 @@ public class SupportAttackData {
     public String getSound() { return sound; }
     public String getParticle() { return particle; }
 
-    /** ef_animation 的 "auto" 特殊值常量 — 表示自动使用 toWeapon 的 EF 武器攻击动画 */
+    /** "auto" 特殊值 — 表示自动使用 toWeapon 的 EF 武器攻击动画 */
     public static final String EF_ANIMATION_AUTO = "auto";
 
-    /** Epic Fight 攻击动画 ResourceLocation，null 表示使用原版攻击逻辑 */
+    /** EF 攻击动画 ResourceLocation，null 表示使用原版攻击逻辑 */
     @Nullable
     public ResourceLocation getEfAnimation() { return efAnimation; }
 
-    /** Epic Fight 动画优先级 */
+    /** EF 动画优先级 */
     public int getEfAnimationPriority() { return efAnimationPriority; }
 
-    /** 是否配置了 Epic Fight 动画（包括 auto 模式） */
+    /** 是否配置了 EF 动画（包括 auto 模式） */
     public boolean hasEfAnimation() { return efAnimation != null; }
 
     /** 是否为 auto 模式（从 toWeapon 的 EF 武器能力自动获取攻击动画） */
     public boolean isAutoAnimation() { return efAnimation != null && EF_ANIMATION_AUTO.equals(efAnimation.getPath()); }
 
-    // ==================== 匹配逻辑 ====================
+    // #endregion
+
+    // #region 匹配逻辑
 
     /**
      * 检查此数据是否匹配给定的武器切换
@@ -138,13 +121,15 @@ public class SupportAttackData {
         );
     }
 
-    // ==================== JSON 反序列化 ====================
+    // #endregion
+
+    // #region JSON 反序列化
 
     /**
      * 从 JsonObject 解析支援攻击数据
      *
      * @param json 数据 JSON 对象
-     * @param id   数据的 ResourceLocation（由文件路径决定）
+     * @param id   数据的 ResourceLocation
      * @return 解析后的 SupportAttackData
      * @throws JsonParseException 格式错误时抛出
      */
@@ -170,9 +155,9 @@ public class SupportAttackData {
                 ? json.get("particle").getAsString() : "crit";
 
         ResourceLocation efAnimation = null;
-            efAnimation = json.has("ef_animation") && !json.get("ef_animation").isJsonNull()
+        efAnimation = json.has("ef_animation") && !json.get("ef_animation").isJsonNull()
                 ? ResourceLocation.parse(json.get("ef_animation").getAsString()) : null;
-        
+
         int efAnimationPriority = json.has("ef_animation_priority")
                 ? json.get("ef_animation_priority").getAsInt() : 0;
 
@@ -184,4 +169,6 @@ public class SupportAttackData {
                 efAnimation, efAnimationPriority
         );
     }
+
+    // #endregion
 }

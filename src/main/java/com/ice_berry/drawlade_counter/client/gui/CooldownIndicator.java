@@ -6,7 +6,7 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * 冷却指示器渲染
  * 在武器槽位上叠加冷却遮罩，采用透明度渐变动画。
- * 视觉效果：半透明深蓝黑色遮罩覆盖整个槽位，遮罩透明度随冷却进度递减（冷却越久越暗，即将结束时变亮剩余秒数以白色文字显示在槽位中央
+ * 剩余秒数以白色文字显示在槽位中央。
  */
 public final class CooldownIndicator {
 

@@ -12,8 +12,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 冷却更新数据包 (S2C)
  * 服务端通知客户端某个武器槽位的冷却状态。
- *
- * <p>协议：{@code [byte slot, varint cooldownTicks]}</p>
  */
 public record CooldownUpdatePacket(int slot, int cooldownTicks) implements CustomPacketPayload {
 

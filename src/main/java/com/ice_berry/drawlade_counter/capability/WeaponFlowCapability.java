@@ -20,6 +20,12 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
     /** 各流转槽位的最大冷却时间（tick），用于 HUD 进度显示 */
     private final int[] maxCooldowns;
 
+    /** 完美格挡强化攻击是否激活 */
+    private boolean perfectGuardActive;
+
+    /** 完美格挡强化攻击剩余有效 tick */
+    private int perfectGuardRemainingTicks;
+
     public WeaponFlowCapability() {
         this.currentActiveSlot = 0;
         this.weaponSlotIndices = DEFAULT_WEAPON_SLOT_INDICES.clone();
@@ -27,7 +33,7 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
         this.maxCooldowns = new int[WEAPON_SLOT_COUNT];
     }
 
-    // ==================== 槽位索引管理 ====================
+    // #region 槽位索引管理
 
     @Override
     public int getCurrentActiveSlot() {
@@ -62,7 +68,7 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
         System.arraycopy(indices, 0, this.weaponSlotIndices, 0, WEAPON_SLOT_COUNT);
     }
 
-    // ==================== 冷却管理 ====================
+    // #region 冷却管理
 
     @Override
     public boolean isSlotOnCooldown(int flowSlot) {
@@ -121,7 +127,7 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
         }
     }
 
-    // ==================== 武器切换（闭环序列） ====================
+    // #region 武器切换
 
     @Override
     public void switchToNextWeapon() {
@@ -133,7 +139,29 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
         currentActiveSlot = (currentActiveSlot - 1 + WEAPON_SLOT_COUNT) % WEAPON_SLOT_COUNT;
     }
 
-    // ==================== Tick 更新 ====================
+    // #region 完美格挡状态
+
+    @Override
+    public boolean isPerfectGuardActive() {
+        return perfectGuardActive;
+    }
+
+    @Override
+    public void setPerfectGuardActive(boolean active) {
+        this.perfectGuardActive = active;
+    }
+
+    @Override
+    public int getPerfectGuardRemainingTicks() {
+        return perfectGuardRemainingTicks;
+    }
+
+    @Override
+    public void setPerfectGuardRemainingTicks(int ticks) {
+        this.perfectGuardRemainingTicks = Math.max(0, ticks);
+    }
+
+    // #region Tick 更新
 
     @Override
     public void tick() {
@@ -145,9 +173,17 @@ public class WeaponFlowCapability implements IWeaponFlowCapability {
                 }
             }
         }
+
+        // 递减完美格挡强化攻击剩余时间
+        if (perfectGuardActive && perfectGuardRemainingTicks > 0) {
+            perfectGuardRemainingTicks--;
+            if (perfectGuardRemainingTicks == 0) {
+                perfectGuardActive = false;
+            }
+        }
     }
 
-    // ==================== 序列化 / 反序列化 ====================
+    // #region 序列化
 
     private static final String TAG_ACTIVE_SLOT = "ActiveSlot";
     private static final String TAG_SLOT_INDICES = "SlotIndices";

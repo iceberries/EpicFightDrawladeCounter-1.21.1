@@ -1,6 +1,5 @@
 package com.ice_berry.drawlade_counter.datagen;
 
-import com.ice_berry.drawlade_counter.EFDCMod;
 import com.ice_berry.drawlade_counter.datagen.i18n.LangProvider;
 import com.ice_berry.drawlade_counter.datagen.i18n.en_us;
 import com.ice_berry.drawlade_counter.datagen.i18n.zh_cn;
@@ -27,10 +26,6 @@ public final class EFDCDatagen {
 
         // 客户端数据生成 - 语言文件
         initI18n(output).forEach(provider -> addClientProvider(event, generator, provider));
-
-        // 后续可在此处添加更多数据生成器：
-        // addServerProvider(event, generator, new DatagenBlockTag(output, ...));
-        // addClientProvider(event, generator, new DatagenItemModel(output, ...));
     }
 
     /**

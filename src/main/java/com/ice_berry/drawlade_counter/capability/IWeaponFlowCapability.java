@@ -15,7 +15,7 @@ public interface IWeaponFlowCapability {
     /** 默认快捷栏槽位索引 */
     int[] DEFAULT_WEAPON_SLOT_INDICES = {0, 1, 2, 3};
 
-    // ==================== 槽位索引管理 ====================
+    // #region 槽位索引管理
 
     /**
      * 获取当前激活的流转槽位索引 (0 ~ WEAPON_SLOT_COUNT-1)
@@ -51,7 +51,7 @@ public interface IWeaponFlowCapability {
      */
     void setWeaponSlotIndices(int[] indices);
 
-    // ==================== 冷却管理 ====================
+    // #region 冷却管理
 
     /**
      * 检查指定流转槽位是否处于冷却中
@@ -97,7 +97,7 @@ public interface IWeaponFlowCapability {
      */
     void clearAllCooldowns();
 
-    // ==================== 武器切换（闭环序列） ====================
+    // #region 武器切换
 
     /**
      * 切换到下一个武器槽位（闭环，末尾回到开头）
@@ -109,14 +109,44 @@ public interface IWeaponFlowCapability {
      */
     void switchToPreviousWeapon();
 
-    // ==================== Tick 更新 ====================
+    // #region 完美格挡状态
+
+    /**
+     * 检查玩家是否持有强化攻击状态（完美格挡触发后）
+     *
+     * @return true 表示强化攻击有效
+     */
+    boolean isPerfectGuardActive();
+
+    /**
+     * 设置玩家强化攻击状态
+     *
+     * @param active true 表示激活强化攻击
+     */
+    void setPerfectGuardActive(boolean active);
+
+    /**
+     * 获取强化攻击剩余有效 tick
+     *
+     * @return 剩余 tick 数
+     */
+    int getPerfectGuardRemainingTicks();
+
+    /**
+     * 设置强化攻击剩余有效 tick
+     *
+     * @param ticks 剩余 tick 数
+     */
+    void setPerfectGuardRemainingTicks(int ticks);
+
+    // #region Tick 更新
 
     /**
      * 每服务端 tick 调用，递减所有槽位的冷却时间
      */
     void tick();
 
-    // ==================== 序列化 / 反序列化 ====================
+    // #region 序列化
 
     /**
      * 将当前状态序列化到 NBT

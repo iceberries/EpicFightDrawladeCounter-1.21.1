@@ -1,7 +1,9 @@
 package com.ice_berry.drawlade_counter.network;
 
 import com.ice_berry.drawlade_counter.network.packets.CooldownUpdatePacket;
-import com.ice_berry.drawlade_counter.network.packets.TriggerEffectPacket;
+import com.ice_berry.drawlade_counter.network.packets.GuardHitPacket;
+import com.ice_berry.drawlade_counter.network.packets.PerfectGuardStatePacket;
+import com.ice_berry.drawlade_counter.network.packets.PerfectGuardTriggerPacket;
 import com.ice_berry.drawlade_counter.network.packets.WeaponSwitchPacket;
 
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -28,32 +30,47 @@ public class NetworkHandler {
                 WeaponSwitchPacket::handle
         );
 
-        // 注册 TriggerEffectPacket（服务端 → 客户端）
-        registrar.playToClient(
-                TriggerEffectPacket.TYPE,
-                TriggerEffectPacket.STREAM_CODEC,
-                NetworkHandler::handleTriggerEffect  // 方法引用
-        );
-        
-        // 注册 CooldownUpdatePacket（同样方式）
+        // 注册 CooldownUpdatePacket（服务端 → 客户端）
         registrar.playToClient(
                 CooldownUpdatePacket.TYPE,
                 CooldownUpdatePacket.STREAM_CODEC,
                 NetworkHandler::handleCooldownUpdate
         );
-    }
-    
-    // 客户端处理 TriggerEffectPacket
-    private static void handleTriggerEffect(TriggerEffectPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            com.ice_berry.drawlade_counter.client.render.ParticleManager.spawnParticles(
-                    packet.x(), packet.y(), packet.z(),
-                    packet.particleType(), packet.dirX(), packet.dirY(), packet.dirZ());
-        });
+
+        // 注册 PerfectGuardStatePacket（服务端 → 客户端）
+        registrar.playToClient(
+                PerfectGuardStatePacket.TYPE,
+                PerfectGuardStatePacket.STREAM_CODEC,
+                NetworkHandler::handlePerfectGuardState
+        );
+
+        // 注册 GuardHitPacket（服务端 → 客户端）
+        registrar.playToClient(
+                GuardHitPacket.TYPE,
+                GuardHitPacket.STREAM_CODEC,
+                NetworkHandler::handleGuardHit
+        );
+
+        // 注册 PerfectGuardTriggerPacket（客户端 → 服务端）
+        registrar.playToServer(
+                PerfectGuardTriggerPacket.TYPE,
+                PerfectGuardTriggerPacket.STREAM_CODEC,
+                PerfectGuardTriggerPacket::handle
+        );
     }
     
     private static void handleCooldownUpdate(CooldownUpdatePacket packet, IPayloadContext context) {
         CooldownUpdatePacket.handle(packet, context);
+    }
+
+    // 客户端处理 PerfectGuardStatePacket
+    private static void handlePerfectGuardState(PerfectGuardStatePacket packet, IPayloadContext context) {
+        PerfectGuardStatePacket.handle(packet, context);
+    }
+
+    // 客户端处理 GuardHitPacket
+    private static void handleGuardHit(GuardHitPacket packet, IPayloadContext context) {
+        GuardHitPacket.handle(packet, context);
     }
     
     // 发送方法（静态工具方法）

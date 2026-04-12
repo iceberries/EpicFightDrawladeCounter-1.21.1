@@ -1,12 +1,16 @@
 package com.ice_berry.drawlade_counter.api;
 
 import com.ice_berry.drawlade_counter.capability.IWeaponFlowCapability;
+import com.ice_berry.drawlade_counter.combat.PerfectGuardCounterData;
+import com.ice_berry.drawlade_counter.combat.ParryCounterHandler;
 import com.ice_berry.drawlade_counter.combat.SupportAttackData;
 import com.ice_berry.drawlade_counter.config.DataDrivenLoader;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+
+import java.util.Collection;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
@@ -69,5 +73,72 @@ public final class IWeaponFlowAPI {
     @Nullable
     public static SupportAttackData getSupportAttack(ResourceLocation id) {
         return DataDrivenLoader.getSupportAttack(id);
+    }
+
+    // #region 完美格挡 API
+
+    /**
+     * 检查玩家是否持有强化攻击状态（完美格挡触发后）
+     *
+     * @param player 玩家
+     * @return true 表示强化攻击有效
+     */
+    public static boolean hasEnhancedAttack(Player player) {
+        return ParryCounterHandler.hasEnhancedAttack(player);
+    }
+
+    /**
+     * 消耗玩家的强化攻击标记并获取额外伤害倍率
+     * 消耗后标记被移除。
+     *
+     * @param player 玩家
+     * @return 额外伤害倍率，无标记时返回 0
+     */
+    public static float consumeEnhancedAttack(Player player) {
+        return ParryCounterHandler.consumeEnhancedAttack(player);
+    }
+
+    /**
+     * 手动触发完美格挡反击（供第三方模组调用）
+     *
+     * @param player      执行完美格挡的玩家
+     * @param attacker    攻击者
+     * @param counterData 反击数据（null 则自动匹配）
+     */
+    public static void triggerPerfectGuard(Player player,
+                                           net.minecraft.world.entity.LivingEntity attacker,
+                                           @Nullable PerfectGuardCounterData counterData) {
+        ParryCounterHandler.triggerPerfectGuard(player, attacker, counterData);
+    }
+
+    /**
+     * 通过 ID 查找完美格挡反击数据
+     *
+     * @param id 数据 ID
+     * @return 对应数据，不存在返回 null
+     */
+    @Nullable
+    public static PerfectGuardCounterData getParryCounter(ResourceLocation id) {
+        return DataDrivenLoader.getParryCounter(id);
+    }
+
+    /**
+     * 根据武器查找匹配的完美格挡反击数据
+     *
+     * @param weapon 武器 ItemStack
+     * @return 匹配数据，无匹配返回 null
+     */
+    @Nullable
+    public static PerfectGuardCounterData findParryCounter(ItemStack weapon) {
+        return DataDrivenLoader.findParryCounter(weapon);
+    }
+
+    /**
+     * 获取所有已加载的完美格挡反击数据（只读快照）
+     *
+     * @return 数据集合
+     */
+    public static Collection<PerfectGuardCounterData> getAllParryCounters() {
+        return DataDrivenLoader.getAllParryCounters();
     }
 }
