@@ -10,8 +10,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 武器切换数据包 (C2S)
  * 携带旧槽位索引，确保服务端正确计算新旧槽位。
+ * skipSupportAttack 标志用于弹反窗口触发的切换，跳过特殊支援攻击。
  */
-public record WeaponSwitchPacket(int oldSlot, int direction) implements CustomPacketPayload {
+public record WeaponSwitchPacket(int oldSlot, int direction, boolean skipSupportAttack) implements CustomPacketPayload {
 
     public static final Type<WeaponSwitchPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("epicfightdrawladecounter", "weapon_switch"));
@@ -21,8 +22,9 @@ public record WeaponSwitchPacket(int oldSlot, int direction) implements CustomPa
                     (buf, packet) -> {
                         buf.writeByte(packet.oldSlot);
                         buf.writeByte(packet.direction);
+                        buf.writeBoolean(packet.skipSupportAttack);
                     },
-                    buf -> new WeaponSwitchPacket(buf.readByte(), buf.readByte())
+                    buf -> new WeaponSwitchPacket(buf.readByte(), buf.readByte(), buf.readBoolean())
             );
 
     @Override
@@ -36,7 +38,8 @@ public record WeaponSwitchPacket(int oldSlot, int direction) implements CustomPa
     public static void handle(WeaponSwitchPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                WeaponFlowManager.switchWeapon(serverPlayer, packet.oldSlot, packet.direction);
+                WeaponFlowManager.switchWeapon(serverPlayer, packet.oldSlot, packet.direction,
+                        packet.skipSupportAttack);
             }
         });
     }

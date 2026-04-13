@@ -7,7 +7,7 @@ import com.ice_berry.drawlade_counter.config.Config;
 import com.ice_berry.drawlade_counter.config.DataDrivenLoader;
 import com.ice_berry.drawlade_counter.datagen.EFDCDatagen;
 import com.ice_berry.drawlade_counter.network.NetworkHandler;
-import com.ice_berry.drawlade_counter.network.packets.GuardHitPacket;
+
 import com.ice_berry.drawlade_counter.until.epicfight.EFEventsHandler;
 import com.ice_berry.drawlade_counter.until.epicfight.EFSkillIntegration;
 import com.mojang.logging.LogUtils;
@@ -229,8 +229,8 @@ public class EFDCMod {
     // #region EF 原生格挡命中通知
 
     /**
-     * 监听 NeoForge 的 LivingIncomingDamageEvent。
-     * 检测 EF 原生格挡命中（非弹反模式），通知客户端开启判定窗口。
+     * 监听 NeoForge 的 LivingIncomingDamageEvent（NORMAL 优先级）。
+     * 当前仅用于调试日志，弹反窗口由客户端 isEntityAttacking 检测驱动。
      *
      * @param event NeoForge 传入伤害事件
      */
@@ -239,18 +239,12 @@ public class EFDCMod {
         if (!Config.PERFECT_GUARD_ENABLED.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer serverPlayer)) return;
 
-        // 跳过弹反路径（已由 LOW 处理器处理）
         if (EFEventsHandler.getPendingParryTarget(serverPlayer) != null) return;
 
-        // 检测 EF 原生格挡命中，通知客户端开启判定窗口
         boolean isCanceled = event.isCanceled();
         boolean guardActivated = EFSkillIntegration.isGuardSkillActivated(serverPlayer);
         LOGGER.debug("[EFDC] NORMAL: player={}, canceled={}, guardActivated={}",
                 serverPlayer.getName().getString(), isCanceled, guardActivated);
-        if (isCanceled && guardActivated) {
-            LOGGER.debug("[EFDC] NORMAL: 格挡命中，发送 GuardHitPacket 到客户端");
-            NetworkHandler.sendToClient(serverPlayer, new GuardHitPacket());
-        }
     }
 
     // #endregion

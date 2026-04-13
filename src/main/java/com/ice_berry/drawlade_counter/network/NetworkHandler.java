@@ -1,7 +1,7 @@
 package com.ice_berry.drawlade_counter.network;
 
 import com.ice_berry.drawlade_counter.network.packets.CooldownUpdatePacket;
-import com.ice_berry.drawlade_counter.network.packets.GuardHitPacket;
+
 import com.ice_berry.drawlade_counter.network.packets.PerfectGuardStatePacket;
 import com.ice_berry.drawlade_counter.network.packets.PerfectGuardTriggerPacket;
 import com.ice_berry.drawlade_counter.network.packets.WeaponSwitchPacket;
@@ -44,13 +44,6 @@ public class NetworkHandler {
                 NetworkHandler::handlePerfectGuardState
         );
 
-        // 注册 GuardHitPacket（服务端 → 客户端）
-        registrar.playToClient(
-                GuardHitPacket.TYPE,
-                GuardHitPacket.STREAM_CODEC,
-                NetworkHandler::handleGuardHit
-        );
-
         // 注册 PerfectGuardTriggerPacket（客户端 → 服务端）
         registrar.playToServer(
                 PerfectGuardTriggerPacket.TYPE,
@@ -68,11 +61,7 @@ public class NetworkHandler {
         PerfectGuardStatePacket.handle(packet, context);
     }
 
-    // 客户端处理 GuardHitPacket
-    private static void handleGuardHit(GuardHitPacket packet, IPayloadContext context) {
-        GuardHitPacket.handle(packet, context);
-    }
-    
+
     // 发送方法（静态工具方法）
     public static void sendToClient(ServerPlayer player, CustomPacketPayload packet) {
         PacketDistributor.sendToPlayer(player, packet);

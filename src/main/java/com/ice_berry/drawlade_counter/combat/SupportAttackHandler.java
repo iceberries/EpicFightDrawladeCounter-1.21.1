@@ -3,6 +3,7 @@ package com.ice_berry.drawlade_counter.combat;
 import com.ice_berry.drawlade_counter.api.events.SupportAttackEvent;
 import com.ice_berry.drawlade_counter.network.NetworkHandler;
 import com.ice_berry.drawlade_counter.network.packets.CooldownUpdatePacket;
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.ModList;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +27,8 @@ import java.util.List;
  * 负责执行支援攻击的全部逻辑，EF 为软依赖。
  */
 public final class SupportAttackHandler {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /**
      * 检测 Epic Fight 是否可用
@@ -61,30 +65,14 @@ public final class SupportAttackHandler {
         if (!notCancelled) return;
 
         if (useEFAttack) {
-            playEpicFightAnimation(player, attackData, toWeapon);
+            boolean efPlayed = playEpicFightAnimation(player, attackData, toWeapon);
+            if (!efPlayed) {
+                // EF 动画播放失败，回退到原版伤害模式
+                executeVanillaAttack(player, attackData, toWeapon, serverLevel);
+            }
         } else {
             // 原版模式：搜索目标并造成伤害
-            List<LivingEntity> targets = findTargets(player, attackData.getRange());
-            if (targets.isEmpty()) return;
-
-            float baseDamage = player.getAttackStrengthScale(0.5F);
-            float weaponDamage = toWeapon.isEmpty() ? 1.0F
-                    : (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
-            float totalDamage = (baseDamage + weaponDamage) * attackData.getDamageMultiplier();
-
-            for (LivingEntity target : targets) {
-                if (target == player || !target.isAlive()) continue;
-
-                Vec3 knockbackDir = target.position().subtract(player.position())
-                        .normalize().add(0, 0.2, 0).normalize()
-                        .scale(attackData.getKnockback());
-
-                target.hurt(serverLevel.damageSources().playerAttack(player), totalDamage);
-                target.knockback(
-                        attackData.getKnockback() * 2.0F,
-                        -knockbackDir.x, -knockbackDir.z);
-                target.invulnerableTime = 0;
-            }
+            executeVanillaAttack(player, attackData, toWeapon, serverLevel);
         }
 
         // 公共逻辑：音效和冷却
@@ -92,6 +80,39 @@ public final class SupportAttackHandler {
 
         if (player instanceof ServerPlayer serverPlayer) {
             NetworkHandler.sendToClient(serverPlayer, new CooldownUpdatePacket(flowSlot, attackData.getCooldownTicks()));
+        }
+    }
+
+    /**
+     * 执行原版模式的伤害逻辑（搜索目标 + 造成伤害）
+     *
+     * @param player      执行者
+     * @param attackData  支援攻击数据
+     * @param toWeapon    当前手持武器
+     * @param serverLevel 服务端世界
+     */
+    private static void executeVanillaAttack(Player player, SupportAttackData attackData,
+                                             ItemStack toWeapon, ServerLevel serverLevel) {
+        List<LivingEntity> targets = findTargets(player, attackData.getRange());
+        if (targets.isEmpty()) return;
+
+        float baseDamage = player.getAttackStrengthScale(0.5F);
+        float weaponDamage = toWeapon.isEmpty() ? 1.0F
+                : (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        float totalDamage = (baseDamage + weaponDamage) * attackData.getDamageMultiplier();
+
+        for (LivingEntity target : targets) {
+            if (target == player || !target.isAlive()) continue;
+
+            Vec3 knockbackDir = target.position().subtract(player.position())
+                    .normalize().add(0, 0.2, 0).normalize()
+                    .scale(attackData.getKnockback());
+
+            target.hurt(serverLevel.damageSources().playerAttack(player), totalDamage);
+            target.knockback(
+                    attackData.getKnockback() * 2.0F,
+                    -knockbackDir.x, -knockbackDir.z);
+            target.invulnerableTime = 0;
         }
     }
 
@@ -144,8 +165,13 @@ public final class SupportAttackHandler {
 
     /**
      * 通过反射播放 EF 动画
+     *
+     * @param player      执行者
+     * @param attackData  支援攻击数据
+     * @param toWeapon    当前手持武器
+     * @return true 表示动画播放成功，false 表示播放失败（调用方应回退到原版伤害）
      */
-    private static void playEpicFightAnimation(Player player, SupportAttackData attackData, ItemStack toWeapon) {
+    private static boolean playEpicFightAnimation(Player player, SupportAttackData attackData, ItemStack toWeapon) {
         try {
             Class<?> epicFightCaps = Class.forName("yesman.epicfight.world.capabilities.EpicFightCapabilities");
             Class<?> playerPatchClass = Class.forName("yesman.epicfight.world.capabilities.entitypatch.player.PlayerPatch");
@@ -156,33 +182,60 @@ public final class SupportAttackHandler {
             var getEntityPatchMethod = epicFightCaps.getMethod("getEntityPatch",
                     net.minecraft.world.entity.Entity.class, Class.class);
             Object playerPatch = getEntityPatchMethod.invoke(null, player, playerPatchClass);
-            if (playerPatch == null) return;
+            if (playerPatch == null) {
+                LOGGER.warn("[EFDC] playEpicFightAnimation: PlayerPatch 为 null, 回退到原版伤害");
+                return false;
+            }
 
             // 确定要播放的动画
             Object animationAccessor;
             if (attackData.isAutoAnimation()) {
                 // AUTO 模式：从 toWeapon 的 EF 武器能力获取攻击动画
+                String weaponName = toWeapon.isEmpty() ? "EMPTY" : toWeapon.getItem().toString();
+                LOGGER.debug("[EFDC] playEpicFightAnimation: AUTO模式, toWeapon={}, " +
+                                "开始解析自动攻击动画", weaponName);
                 animationAccessor = resolveAutoAnimation(toWeapon, playerPatch);
-                if (animationAccessor == null) return;
+                if (animationAccessor == null) {
+                    LOGGER.warn("[EFDC] playEpicFightAnimation: resolveAutoAnimation 返回 null " +
+                            "(weapon={}), 回退到原版伤害", weaponName);
+                    return false;
+                }
+                LOGGER.debug("[EFDC] playEpicFightAnimation: 解析到动画 accessor={}",
+                        animationAccessor);
             } else {
                 // 手动模式：使用 JSON 中配置的固定动画
                 ResourceLocation animLoc = attackData.getEfAnimation();
                 Class<?> animManagerClass = Class.forName("yesman.epicfight.api.animation.AnimationManager");
                 var byKeyMethod = animManagerClass.getMethod("byKey", ResourceLocation.class);
                 animationAccessor = byKeyMethod.invoke(null, animLoc);
+                LOGGER.debug("[EFDC] playEpicFightAnimation: 手动模式, animLoc={}, accessor={}",
+                        animLoc, animationAccessor);
             }
 
-            if (animationAccessor == null) return;
+            if (animationAccessor == null) {
+                LOGGER.warn("[EFDC] playEpicFightAnimation: animationAccessor 为 null, 回退到原版伤害");
+                return false;
+            }
 
             // 检查动画是否已注册并播放
             var isPresentMethod = animationAccessor.getClass().getMethod("isPresent");
-            if (!(boolean) isPresentMethod.invoke(animationAccessor)) return;
+            boolean present = (boolean) isPresentMethod.invoke(animationAccessor);
+            if (!present) {
+                LOGGER.warn("[EFDC] playEpicFightAnimation: 动画未注册 (isPresent=false), " +
+                        "accessor={}, 回退到原版伤害", animationAccessor);
+                return false;
+            }
             var playMethod = livingEntityPatchClass.getMethod("playAnimationInstantly", assetAccessorClass);
             playMethod.invoke(playerPatch, animationAccessor);
+            LOGGER.debug("[EFDC] playEpicFightAnimation: 动画播放成功, accessor={}",
+                    animationAccessor);
+            return true;
         } catch (ClassNotFoundException | NoSuchMethodException e) {
-            // EF 类或 API 不匹配，静默忽略
+            LOGGER.warn("[EFDC] playEpicFightAnimation: EF 类/方法未找到, 回退到原版伤害", e);
+            return false;
         } catch (Exception e) {
-            // 动画播放失败，静默忽略
+            LOGGER.warn("[EFDC] playEpicFightAnimation: 动画播放异常, 回退到原版伤害", e);
+            return false;
         }
     }
 

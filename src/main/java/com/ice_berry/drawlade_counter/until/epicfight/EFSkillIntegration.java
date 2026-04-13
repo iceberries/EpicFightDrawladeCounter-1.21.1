@@ -79,6 +79,27 @@ public final class EFSkillIntegration {
     }
 
     /**
+     * 通过反射获取实体的 EF LivingEntityPatch 实例
+     * 接受 LivingEntity 类型，适用于怪物等非玩家实体。
+     *
+     * @param entity 实体实例
+     * @return LivingEntityPatch 实例，获取失败返回 null
+     */
+    private static Object getEntityPatchForEntity(LivingEntity entity) {
+        try {
+            Class<?> capsClass = Class.forName(
+                    "yesman.epicfight.world.capabilities.EpicFightCapabilities");
+            Class<?> patchClass = Class.forName(
+                    "yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch");
+            var getPatch = capsClass.getMethod("getEntityPatch",
+                    net.minecraft.world.entity.Entity.class, Class.class);
+            return getPatch.invoke(null, entity, patchClass);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * 通过反射获取玩家的 EF LivingEntityPatch 实例
      *
      * @param player 玩家实例
@@ -303,34 +324,32 @@ public final class EFSkillIntegration {
     }
 
     /**
-     * 检查指定实体是否处于 EF 攻击状态
-     * 通过反射调用 EntityState.attacking() 判断。
+     * 检查指定实体是否处于 EF 攻击动画中（含抬手前摇）
+     * 通过反射调用 EntityState.getLevel() 判断。
+     * PHASE_LEVEL: 0=空闲, 1=抬手前摇(anticipation), 2=攻击判定(attacking), 3=恢复(recovery)
+     * 仅由 AttackAnimation.bindPhaseState() 设置，不会受受伤等非攻击动画影响。
      *
      * @param entity 要检查的实体
-     * @return true 表示正在执行攻击动画，EF 未加载或检查失败返回 false
+     * @return true 表示正在执行攻击动画（含前摇），EF 未加载或检查失败返回 false
      */
     public static boolean isEntityAttacking(LivingEntity entity) {
         if (!ModList.get().isLoaded("epicfight")) return false;
 
         try {
-            Class<?> capsClass = Class.forName(
-                    "yesman.epicfight.world.capabilities.EpicFightCapabilities");
-            Class<?> patchClass = Class.forName(
-                    "yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch");
-
-            java.lang.reflect.Method getPatch = capsClass.getMethod("getEntityPatch",
-                    net.minecraft.world.entity.Entity.class, Class.class);
-            Object patch = getPatch.invoke(null, entity, patchClass);
+            Object patch = getEntityPatchForEntity(entity);
             LOGGER.debug("[EFDC] isEntityAttacking: entity={}, patch={}",
                     entity.getName().getString(), patch != null ? "存在" : "null");
             if (patch == null) return false;
 
+            Class<?> patchClass = Class.forName(
+                    "yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch");
             java.lang.reflect.Method getEntityState = patchClass.getMethod("getEntityState");
             Object entityState = getEntityState.invoke(patch);
-            java.lang.reflect.Method attacking = entityState.getClass().getMethod("attacking");
-            boolean result = (boolean) attacking.invoke(entityState);
-            LOGGER.debug("[EFDC] isEntityAttacking: entity={}, attacking={}",
-                    entity.getName().getString(), result);
+            java.lang.reflect.Method getLevel = entityState.getClass().getMethod("getLevel");
+            int level = (int) getLevel.invoke(entityState);
+            boolean result = level > 0;
+            LOGGER.debug("[EFDC] isEntityAttacking: entity={}, phaseLevel={}, attacking={}",
+                    entity.getName().getString(), level, result);
             return result;
         } catch (ClassNotFoundException | NoSuchMethodException e) {
             LOGGER.debug("[EFDC] isEntityAttacking: EF 类/方法未找到 (entity={})",
@@ -380,6 +399,146 @@ public final class EFSkillIntegration {
         } catch (Exception e) {
             LOGGER.debug("[EFDC] getServerPlayerTarget: 反射调用失败", e);
             return null;
+        }
+    }
+
+    /**
+     * 获取指定实体当前攻击动画第一阶段的 preDelay 时间（秒）
+     * preDelay 是攻击抬手前摇阶段的结束时刻，
+     * 即 EntityState.PHASE_LEVEL 从 1(anticipation) 变为 2(attacking) 的时间点。
+     *
+     * 通过反射获取 baseLayer 的 animationPlayer，再从当前播放动画（或 LinkAnimation
+     * 过渡期的目标动画）中读取 AttackAnimation.phases[0].preDelay。
+     * 注意：EF 的 Animator.findFor(Class) 存在 bug，检查的是
+     * AssetAccessor.getClass() 而非实际动画对象的 getClass()，导致
+     * findFor(AttackAnimation.class) 永远返回 null，因此不能使用该方法。
+     *
+     * @param entity 要获取 preDelay 的实体
+     * @return 第一阶段的 preDelay 值（秒），非攻击动画或反射失败时返回 0
+     */
+    public static float getAttackPhasePreDelay(LivingEntity entity) {
+        if (!ModList.get().isLoaded("epicfight")) return 0;
+
+        try {
+            Object patch = getEntityPatchForEntity(entity);
+            if (patch == null) return 0;
+
+            Class<?> patchClass = Class.forName(
+                    "yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch");
+            java.lang.reflect.Method getAnimator = patchClass.getMethod("getAnimator");
+            Object animator = getAnimator.invoke(patch);
+
+            // 获取 baseLayer.animationPlayer（均为 public 字段）
+            java.lang.reflect.Field baseLayerField =
+                    animator.getClass().getField("baseLayer");
+            Object baseLayer = baseLayerField.get(animator);
+            java.lang.reflect.Field animPlayerField =
+                    baseLayer.getClass().getField("animationPlayer");
+            Object animationPlayer = animPlayerField.get(baseLayer);
+
+            // 先尝试 getRealAnimation()：LinkAnimation 过渡期会返回目标动画的 accessor
+            Object animation = null;
+            try {
+                java.lang.reflect.Method getRealAnim =
+                        animationPlayer.getClass().getMethod("getRealAnimation");
+                Object realAnimAccessor = getRealAnim.invoke(animationPlayer);
+                if (realAnimAccessor != null) {
+                    java.lang.reflect.Method get = realAnimAccessor.getClass().getMethod("get");
+                    animation = get.invoke(realAnimAccessor);
+                }
+            } catch (NoSuchMethodException ignored) {
+            }
+
+            // 非过渡期时直接获取 animationPlayer 当前播放的动画
+            if (animation == null) {
+                java.lang.reflect.Method getAnimAccessor =
+                        animationPlayer.getClass().getMethod("getAnimation");
+                Object animAccessor = getAnimAccessor.invoke(animationPlayer);
+                java.lang.reflect.Method get = animAccessor.getClass().getMethod("get");
+                animation = get.invoke(animAccessor);
+            }
+
+            if (animation == null) {
+                LOGGER.debug("[EFDC] getAttackPhasePreDelay: 无法获取动画对象 (entity={})",
+                        entity.getName().getString());
+                return 0;
+            }
+
+            // 检查实际动画对象是否为 AttackAnimation 实例
+            Class<?> attackAnimClass = Class.forName(
+                    "yesman.epicfight.api.animation.types.AttackAnimation");
+            if (!attackAnimClass.isAssignableFrom(animation.getClass())) {
+                LOGGER.debug("[EFDC] getAttackPhasePreDelay: 当前动画非 AttackAnimation (entity={}, animClass={})",
+                        entity.getName().getString(), animation.getClass().getSimpleName());
+                return 0;
+            }
+
+            // 读取 public final Phase[] phases 字段，取第一个 phase 的 preDelay
+            java.lang.reflect.Field phasesField = attackAnimClass.getField("phases");
+            Object phases = phasesField.get(animation);
+            if (phases != null && java.lang.reflect.Array.getLength(phases) > 0) {
+                Object firstPhase = java.lang.reflect.Array.get(phases, 0);
+                java.lang.reflect.Field preDelayField = firstPhase.getClass().getField("preDelay");
+                float preDelay = preDelayField.getFloat(firstPhase);
+                LOGGER.debug("[EFDC] getAttackPhasePreDelay: entity={}, preDelay={}s",
+                        entity.getName().getString(), preDelay);
+                return preDelay;
+            }
+            return 0;
+        } catch (Exception e) {
+            LOGGER.debug("[EFDC] getAttackPhasePreDelay: 反射调用失败 (entity={})",
+                    entity.getName().getString(), e);
+            return 0;
+        }
+    }
+
+    /**
+     * 获取指定实体当前攻击动画的总时长（秒）
+     * 通过反射依次尝试 Animator 的多种方法名获取当前播放的动画，
+     * 再调用其 getTotalTime() 获取动画总时长。
+     *
+     * @param entity 要获取动画时长的实体
+     * @return 动画总时长（秒），EF 未加载或反射失败时返回 0
+     */
+    public static float getAttackAnimationDuration(LivingEntity entity) {
+        if (!ModList.get().isLoaded("epicfight")) return 0;
+
+        try {
+            Object patch = getEntityPatchForEntity(entity);
+            if (patch == null) return 0;
+
+            Class<?> patchClass = Class.forName(
+                    "yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch");
+            java.lang.reflect.Method getAnimator = patchClass.getMethod("getAnimator");
+            Object animator = getAnimator.invoke(patch);
+
+            // 尝试多种方法名获取当前播放的动画对象
+            Object animation = null;
+            String[] methodNames = {"getCurrentAnimation", "getPlayingAnimation", "currentAnimation"};
+            for (String name : methodNames) {
+                try {
+                    java.lang.reflect.Method m = animator.getClass().getMethod(name);
+                    animation = m.invoke(animator);
+                    if (animation != null) break;
+                } catch (NoSuchMethodException ignored) {
+                }
+            }
+            if (animation == null) {
+                LOGGER.debug("[EFDC] getAttackAnimationDuration: 无法获取当前动画 (entity={})",
+                        entity.getName().getString());
+                return 0;
+            }
+
+            // 获取动画总时长（秒）
+            java.lang.reflect.Method getTotalTime = animation.getClass().getMethod("getTotalTime");
+            float totalTime = (float) getTotalTime.invoke(animation);
+            LOGGER.debug("[EFDC] getAttackAnimationDuration: entity={}, duration={}s",
+                    entity.getName().getString(), totalTime);
+            return totalTime;
+        } catch (Exception e) {
+            LOGGER.debug("[EFDC] getAttackAnimationDuration: 反射调用失败 (entity={})",
+                    entity.getName().getString(), e);
+            return 0;
         }
     }
 

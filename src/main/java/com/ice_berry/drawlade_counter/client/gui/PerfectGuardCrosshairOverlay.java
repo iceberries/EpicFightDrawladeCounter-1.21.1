@@ -23,10 +23,10 @@ public final class PerfectGuardCrosshairOverlay implements LayeredDraw.Layer {
             ResourceLocation.fromNamespaceAndPath("epicfightdrawladecounter", "perfect_guard_crosshair");
 
     /** 准星线条粗细 */
-    private static final int THICKNESS = 2;
+    private static final int THICKNESS = 3;
 
     /** 准星臂长 */
-    private static final int ARM_LENGTH = 9;
+    private static final int ARM_LENGTH = 10;
 
     /** 准星中心间隙 */
     private static final int GAP = 4;

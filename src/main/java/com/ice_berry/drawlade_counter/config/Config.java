@@ -35,10 +35,11 @@ public class Config {
 
     // #region 完美格挡配置
 
-    /** 完美格挡按键判定窗口（秒） */
+    /** 完美格挡判定窗口占攻击动画的百分比（0-1），从动画开始播放算起 */
     public static final ModConfigSpec.DoubleValue PERFECT_GUARD_WINDOW = BUILDER
-            .comment("Time window (in seconds) to press weapon flow key after guarding a hit (default: 1.0s)")
-            .defineInRange("perfectGuardWindow", 1.0, 0.05, 2.0);
+            .comment("Percentage (0-1) of the attack animation duration as the perfect guard window, "
+                    + "starting from the beginning of the animation (default: 0.8 = 80%)")
+            .defineInRange("perfectGuardWindow", 0.8, 0.01, 1.0);
 
     /** 完美格挡反击伤害倍率 */
     public static final ModConfigSpec.DoubleValue PERFECT_GUARD_DAMAGE_MULTIPLIER = BUILDER

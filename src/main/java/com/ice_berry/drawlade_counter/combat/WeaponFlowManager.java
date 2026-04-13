@@ -22,11 +22,13 @@ public final class WeaponFlowManager {
     /**
      * 处理武器切换请求（服务端调用）
      *
-     * @param player    发起切换的玩家
-     * @param oldSlot   客户端发送的旧槽位索引
-     * @param direction 切换方向：+1 下一武器，-1 上一武器
+     * @param player            发起切换的玩家
+     * @param oldSlot           客户端发送的旧槽位索引
+     * @param direction         切换方向：+1 下一武器，-1 上一武器
+     * @param skipSupportAttack 是否跳过特殊支援攻击（弹反窗口触发时为 true）
      */
-    public static void switchWeapon(Player player, int oldSlot, int direction) {
+    public static void switchWeapon(Player player, int oldSlot, int direction,
+                                     boolean skipSupportAttack) {
         IWeaponFlowCapability cap = WeaponFlowProvider.getCapability(player);
         if (cap == null) return;
 
@@ -50,14 +52,16 @@ public final class WeaponFlowManager {
             serverPlayer.containerMenu.broadcastChanges();
         }
 
-        // 查找并执行支援攻击
-        @Nullable
-        SupportAttackData attackData = DataDrivenLoader.findSupportAttack(fromWeapon, toWeapon);
-        if (attackData != null && !cap.isSlotOnCooldown(newSlot)) {
-            // 设置目标槽位和原槽位冷却
-            cap.setSlotCooldown(newSlot, attackData.getCooldownTicks());
-            cap.setSlotCooldown(oldSlot, attackData.getCooldownTicks() / 2);
-            SupportAttackHandler.executeSupportAttack(player, attackData, fromWeapon, toWeapon, newSlot);
+        // 查找并执行支援攻击（弹反窗口触发的切换跳过支援攻击）
+        if (!skipSupportAttack) {
+            @Nullable
+            SupportAttackData attackData = DataDrivenLoader.findSupportAttack(fromWeapon, toWeapon);
+            if (attackData != null && !cap.isSlotOnCooldown(newSlot)) {
+                // 设置目标槽位和原槽位冷却
+                cap.setSlotCooldown(newSlot, attackData.getCooldownTicks());
+                cap.setSlotCooldown(oldSlot, attackData.getCooldownTicks() / 2);
+                SupportAttackHandler.executeSupportAttack(player, attackData, fromWeapon, toWeapon, newSlot);
+            }
         }
 
         // 同步冷却到客户端
